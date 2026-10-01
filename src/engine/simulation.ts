@@ -106,6 +106,8 @@ export class Simulation {
   /** Current distance-to-exit field. */
   readonly dist: Float64Array;
   readonly exitCounts: number[];
+  /** Cells where fires were started (not cells the fire later spread to). */
+  readonly ignitions: number[] = [];
   time = 0;
   evacuated = 0;
   dead = 0;
@@ -180,8 +182,12 @@ export class Simulation {
   /** Start a fire at a grid cell. Returns false for walls or already-burning cells. */
   igniteAt(gx: number, gy: number): boolean {
     if (gx < 0 || gy < 0 || gx >= this.width || gy >= this.height) return false;
-    const ok = this.fire.ignite(gy * this.width + gx);
-    if (ok) this.nextReplan = this.time; // re-route on the next step
+    const cell = gy * this.width + gx;
+    const ok = this.fire.ignite(cell);
+    if (ok) {
+      this.ignitions.push(cell);
+      this.nextReplan = this.time; // re-route on the next step
+    }
     return ok;
   }
 

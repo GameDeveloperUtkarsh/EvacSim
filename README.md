@@ -20,6 +20,7 @@ The floor plan is a grid of 0.5 m cells (floor, wall, door, exit). Every hazard 
 - **Behaviour**: per-agent walking speed (0.9 to 1.5 m/s) and pre-movement time (0 to 15 s), cut short when smoke reaches them.
 - **Fire**: cellular spread + diffusing smoke vented at exits; smoke and flames cost health (`src/engine/fire.ts`).
 - **Score**: preliminary A to F grade from survival and 95% evacuation time (`src/engine/score.ts`).
+- **Fix finder**: proposes building changes (new exits where they shorten the most escape routes, wider exits, wider busy doors), re-simulates each with the same people and fire over several seeds, and ranks them by lives and seconds saved (`src/engine/recommend.ts`, run in a Web Worker). Any fix can be replayed side by side against the original or applied to the plan.
 
 The engine has no DOM dependencies and is deterministic per seed, so the same scenario can be re-run headless to compare designs.
 
@@ -29,6 +30,7 @@ The engine has no DOM dependencies and is deterministic per seed, so the same sc
 src/engine/   simulation core (pure TS): plan, flow field, fire, agents, scoring, plan checks, sample buildings
 src/editor/   plan editor (tools, canvas, panel)
 src/view/     2D canvas and 3D (react-three-fiber) renderers
+src/recommend/ fix finder panel, worker hook, side-by-side compare view
 src/App.tsx   controls, live stats, grade card
 tests/        vitest engine tests
 ```
@@ -38,7 +40,7 @@ tests/        vitest engine tests
 - [x] Grid engine, flow-field agents, crowd density, fire and smoke, 2D/3D views, heatmap, grade
 - [x] Plan editor: wall/room/door/exit/erase tools, undo, reachability checks, JSON import/export, autosave
 - [ ] Flood and earthquake scenarios
+- [x] Fix finder: candidate fixes tested in a Web Worker, ranked, side-by-side before/after replay, apply to plan
 - [ ] Bottleneck detection
-- [ ] Suggestion engine: try fixes in headless runs (Web Worker), show before/after
 - [ ] Image upload and wall detection (OpenCV.js)
 - [ ] Report screen, real-incident demo layout

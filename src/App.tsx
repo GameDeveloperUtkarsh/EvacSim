@@ -5,6 +5,8 @@ import { TOOLS, type Tool } from './editor/tools';
 import { analyzePlan } from './engine/analysis';
 import { parsePlan, serializePlan } from './engine/plan';
 import { SAMPLE_PLANS } from './engine/samples';
+import { CompareView } from './recommend/CompareView';
+import { FixFinder, type FixContext } from './recommend/FixFinder';
 import { gradeRun } from './engine/score';
 import { Simulation, type SimMetrics } from './engine/simulation';
 import { Cell, type FloorPlan } from './engine/types';
@@ -89,6 +91,9 @@ export default function App() {
   const [view, setView] = useState<'2d' | '3d'>(SCENARIO.view ?? '3d');
   const [heatmap, setHeatmap] = useState(SCENARIO.heatmap);
   const scenarioSim = useRef<Simulation | null>(null);
+  const [compare, setCompare] = useState<FixContext | null>(null);
+  // Fire starts to re-apply once the next simulation exists (after applying a fix).
+  const pendingFires = useRef<number[] | null>(null);
 
   const sample = SAMPLE_PLANS.find((p) => p.id === planId) ?? SAMPLE_PLANS[0];
   const samplePlan = useMemo(() => sample.build(), [sample]);
@@ -133,6 +138,13 @@ export default function App() {
     } else {
       setStopAt(undefined);
     }
+  }, [sim]);
+
+  useEffect(() => {
+    const fires = pendingFires.current;
+    if (!fires) return;
+    pendingFires.current = null;
+    for (const cell of fires) sim.igniteAt(cell % sim.width, Math.floor(cell / sim.width));
   }, [sim]);
 
   useEffect(() => {
@@ -182,6 +194,19 @@ export default function App() {
   });
 
   const floorArea = analysis.floorArea;
+
+  const openCompare = (fix: FixContext) => {
+    setRunning(false);
+    setCompare(fix);
+  };
+
+  /** Save the fixed layout as the user's plan (undoable in the editor) and keep the same fire. */
+  const applyFix = (fix: FixContext) => {
+    commitPlan(fix.recommendation.plan);
+    setPlanId(CUSTOM_ID);
+    pendingFires.current = fix.scenario.fires;
+    setCompare(null);
+  };
 
   const igniteAt = (gx: number, gy: number) => {
     sim.igniteAt(gx, gy);
@@ -287,6 +312,17 @@ export default function App() {
               <button onClick={randomFire}>Random fire</button>
             </section>
 
+            <FixFinder
+              key={sim.id}
+              sim={sim}
+              plan={plan}
+              agentCount={agentCount}
+              seed={seed}
+              disabled={analysis.exitCount === 0}
+              onCompare={openCompare}
+              onApply={applyFix}
+            />
+
             <section className="row">
               <button className="primary grow" onClick={() => setRunning((r) => !r)} disabled={metrics.finished}>
                 {metrics.finished ? 'Finished' : running ? 'Pause' : 'Run'}
@@ -347,6 +383,8 @@ export default function App() {
             unreachable={analysis.unreachable}
             onCommit={(cells) => commitPlan({ ...customPlan, cells })}
           />
+        ) : compare ? (
+          <CompareView fix={compare} onApply={() => applyFix(compare)} onClose={() => setCompare(null)} />
         ) : (
           <ViewComponent sim={sim} heatmap={heatmap} onCellClick={igniteAt} />
         )}
